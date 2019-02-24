@@ -20,7 +20,22 @@ Delete an existing sftp-only user.
 
 As root do the following.
 
-#### 1. Setup sshd_config
+#### 1. Copy over files
+
+Copy this repository sftponly directory into the /home directory.
+
+```
+cd /tmp
+wget https://github.com/sitecode/sftponly/archive/master.zip
+unzip master.zip
+mv /tmp/sftponly-master/sftponly/ /home
+rm /tmp/sftponly-master
+cd /home
+chmod 711 /home/sftponly/
+chmod -R 750 /home/sftponly/bin/
+```
+
+#### 2. Setup sshd_config
 
 Edit sshd config file:
 
@@ -32,22 +47,29 @@ Comment out previous Subsystem sftp line and change it to internal-sftp:
 
 ```
 #Subsystem      sftp    /usr/libexec/openssh/sftp-server
+#sftponly setup
 Subsystem       sftp    internal-sftp
 ```
 
 And add a match group for all the sftp-only users:
 
 ```
+#sftponly setup
 Match Group sftponly
 	X11Forwarding no
 	AllowTcpForwarding no
-	#ChrootDirectory %h
-	ChrootDirectory /var/www/sftp/%u
+	ChrootDirectory %h
 	MaxSessions 1
 	ForceCommand internal-sftp
 ```
 
-#### 2. Setup PAM sshd
+Restart sshd (depends on your system, CentOS 7 below):
+
+```
+/bin/systemctl restart sshd.service
+```
+
+#### 3. Setup PAM sshd
 
 Edit PAM sshd session file:
 
@@ -61,15 +83,28 @@ Add at the bottom:
 session    optional     pam_exec.so quiet /home/sftponly/bin/pam.d-sshd
 ```
 
-#### 3. Copy over files
-
-Copy this sftponly directory into the /home directory.
-
-```
-cd /home
-```
-
 #### 4. Install gpg recipent public key and update bin/pam.d-sshd
+
+List current keys:
+
+```
+gpg -k
+```
+
+**or** add new public key:
+
+```
+gpg --import [public key.asc]
+```
+
+**And update** encryption option with desired gpg recipient:
+
+```
+vi /home/sftponly/bin/pam.d-sshd
+```
+
+And change `[GPG RECIPIENT]` with the desired recipient identifier (i.e. email address or name).
+
 
 ## Authors
 
@@ -77,7 +112,7 @@ cd /home
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details
 
 ## Acknowledgments
 

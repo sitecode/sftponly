@@ -49,12 +49,12 @@ if [ "$?" -eq "0" ]; then echo "--Added SFTP-Only $vhostUsername Group: $vhostSf
 #add vhost user to the their sftp group
 $(usermod -a -G $vhostSftponlyGroup $vhostUsername)
 
-#TODOcreate log file
-
+#create chroot directory and vhost directory where files will be stored
 mkdir -p $homedir/files
 mkdir -p $userdir/files
 
 #store sftp files in vhost users sftp directory
+#do dynamic instead, see pam.d-sshd
 #static mounting
 #TODO quota
 #mount --bind $userdir/files $homedir/files

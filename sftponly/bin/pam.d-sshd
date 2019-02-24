@@ -13,13 +13,13 @@ if [ "$groups" -ne "0" ]; then
 
 	#TODO make this a utility function
 	username="$PAM_USER"
-	#get primary username group, should be of form sftponly-$cpanelusername
-	cpanelGroup=$(id -gn $username)
-	cpanelUsername=${cpanelGroup:9}
+	#get primary username group, should be of form sftponly-$vhostusername
+	vhostGroup=$(id -gn $username)
+	vhostUsername=${vhostGroup:9}
 	basedir="/home"
-	homedir="$basedir/sftponly/$cpanelUsername/$username/files"
-	userdir="$basedir/$cpanelUsername/sftponly/$username/files"
-	logFile="$basedir/$cpanelUsername/sftponly/$username/sftp.log"
+	homedir="$basedir/sftponly/$vhostUsername/$username/files"
+	userdir="$basedir/$vhostUsername/sftponly/$username/files"
+	logFile="$basedir/$vhostUsername/sftponly/$username/sftp.log"
 	cd $userdir
 
 	#mount userdir
