@@ -1,13 +1,26 @@
 #!/bin/bash
-sftpBaseDir="/var/www/sftp/"
+basedir="/home"
 
-if [ -z "$1" ]
-  then
-    echo "Missing username"
+if [ -z "$1" ]; then
+    echo "Missing vhost username"
+    exit 1
+fi
+vhostUsername="$1"
+
+userExists=$(id -u $vhostUsername > /dev/null 2>&1; echo $?) 
+if [ "$userExists" -ne "0" ]; then
+	echo "vhost user $vhostUsername not found."
+	exit 2
+fi
+
+if [ -z "$2" ]; then
+    echo "Missing sftp username"
     exit 1
 fi
 
-username="sftp-$(date +'%Y%m%d%H%M%S')-$1"
+username="sftp-$(date +'%Y%m%d%H%M%S')-$2"
+homedir="$basedir/sftponly/$vhostUsername/$username"
+userdir="$basedir/$vhostUsername/sftponly/$username"
 
 userExists=$(id -u $username > /dev/null 2>&1; echo $?) 
 if [ "$userExists" -eq "0" ]; then
@@ -15,31 +28,61 @@ if [ "$userExists" -eq "0" ]; then
 	exit 2
 fi
 
-userExists=$(find $sftpBaseDir -name "*$1" 2>/dev/null | wc -l) 
+userExists=$(find $basedir/$vhostUsername/sftponly/ -type d -name "*$2" 2>/dev/null | wc -l) 
 if [ "$userExists" -ne "0" ]; then
-	echo "User $1 already exists."
-	echo $(find $sftpBaseDir -name "*$1")
+	echo "User $2 already exists."
+	echo $(find $basedir/$vhostUsername/sftponly/ -type d -name "*$2")
 	exit 3
 fi
 
-
 echo "Adding SFTP user: $username"
 echo "----------------"
+sftponlyGroup="sftponly"
+vhostSftponlyGroup="$sftponlyGroup-$vhostUsername"
 
-#create the user, becasue all users have /files as their directory it'll say directory already exists
-useradd -g sftpusers -d /files -s /sbin/nologin $username
+#make sure we have a sftpusers group
+$(groupadd $sftponlyGroup 2> /dev/null)
+if [ "$?" -eq "0" ]; then echo "--Added SFTP-Only Group: $sftponlyGroup"; fi
+#and a vhost sftpusers group
+$(groupadd $vhostSftponlyGroup 2> /dev/null)
+if [ "$?" -eq "0" ]; then echo "--Added SFTP-Only $vhostUsername Group: $vhostSftponlyGroup"; fi
+#add vhost user to the their sftp group
+$(usermod -a -G $vhostSftponlyGroup $vhostUsername)
+
+#TODOcreate log file
+
+mkdir -p $homedir/files
+mkdir -p $userdir/files
+
+#store sftp files in vhost users sftp directory
+#static mounting
+#TODO quota
+#mount --bind $userdir/files $homedir/files
+#if [ "$?" -eq "0" ]; then echo "--Mounted: $userdir/files to $homedir/files"; fi
+##mount on reboot
+#tail -1 /etc/mtab >> /etc/fstab
+
+#create the sftp user
+useradd -g $vhostSftponlyGroup -G $sftponlyGroup -d $homedir -s /sbin/nologin $username
+if [ "$?" -eq "0" ]; then echo "--Added user."; fi
 
 #set the password automatically
 #passwd $username, returns 0 on success
 #https://www.howtogeek.com/howto/30184/10-ways-to-generate-a-random-password-from-the-command-line/
 #userpass=$(< /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c${1:-32};echo;)
 userpass=$(openssl rand -base64 18)
-echo -e "$userpass\n$userpass" | passwd $username
+$(echo -e "$userpass\n$userpass" | passwd $username > /dev/null 2>&1)
+if [ "$?" -eq "0" ]; then echo "--Changed password."; fi
 
-#create user sftp files directory (their home directory)
-userdir="$sftpBaseDir$username/files/"
-mkdir -p $userdir
-chown $username $userdir
+chown $username:$vhostSftponlyGroup $homedir/files
+chown $vhostUsername:$vhostUsername $basedir/$vhostUsername/sftponly
+chown $vhostUsername:$vhostUsername $basedir/$vhostUsername/sftponly/$username
+chown $vhostUsername:$vhostSftponlyGroup $basedir/$vhostUsername/sftponly/$username/files
+chmod 775 $basedir/$vhostUsername/sftponly/$username/files
+#setup log file
+touch $userdir/sftp.log
+chown $vhostUsername:$vhostUsername $userdir/sftp.log
+chmod 660 $userdir/sftp.log
 
 echo "---------------"
 echo "Added SFTP user"

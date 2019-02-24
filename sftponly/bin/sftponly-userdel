@@ -1,23 +1,30 @@
 #!/bin/bash
+basedir="/home"
 
-if [ -z "$1" ]
-  then
-    echo "Missing username"
+if [ -z "$1" ]; then
+    echo "Missing vhost username"
     exit 1
 fi
+vhostUsername="$1"
 
-username="$1"
-
-#validations checks
-userExists=$(id -u $username > /dev/null 2>&1; echo $?) 
-if [ "$userExists" -eq "1" ]; then
-	echo "User $username not found."
+userExists=$(id -u $vhostUsername > /dev/null 2>&1; echo $?) 
+if [ "$userExists" -ne "0" ]; then
+	echo "vhost user $vhostUsername not found."
 	exit 2
 fi
 
-sftpGroup=$(id -nG "$username" | grep -qw "sftpusers" > /dev/null 2>&1; echo $?)
+if [ -z "$2" ]; then
+    echo "Missing sftp username"
+    exit 1
+fi
+
+username="$2"
+homedir="$basedir/sftponly/$vhostUsername/$username"
+userdir="$basedir/$vhostUsername/sftponly/$username"
+
+sftpGroup=$(id -nG "$username" | grep -qw "sftponly" > /dev/null 2>&1; echo $?)
 if [ "$sftpGroup" -eq "1" ]; then
-	echo "User $username not in sftpuser group."
+	echo "User $username not in sftponly group."
 	exit 3
 fi
 
@@ -30,15 +37,26 @@ fi
 echo "Deleting SFTP user: $username"
 echo "------------------"
 
+#in case not unmounted, do it now
+umount $homedir
+if [ "$?" -eq "0" ]; then echo "--Unmounted: $homedir"; fi
+rm -Rf $homedir
+
 #delete user
 userdel -f $username
+if [ "$?" -eq "0" ]; then echo "--Removed user: $username"; fi
 
-#remove sfpt files directory
-userdir="/var/www/sftp/$username"
+#remove sftp files directory
 #rm -Rf $userdir
+echo
+find $userdir
+read -p "Delete users files found above? (yN)" yn
+    case $yn in
+        [Yy]* ) 
+		echo "Deleting files now."; 
+		rm -Rf $userdir;
+		if [ "$?" -eq "0" ]; then echo "--Deleted user files."; fi
+    esac
 
-echo "Deleted SFTP user"
 echo "-----------------"
-echo "Username: $username"
-echo "To remove user files run:"
-echo "# rm -Rf $userdir"
+echo "Deleted SFTP user"
