@@ -1,0 +1,44 @@
+#!/bin/bash
+
+if [ -z "$1" ]
+  then
+    echo "Missing username"
+    exit 1
+fi
+
+username="$1"
+
+#validations checks
+userExists=$(id -u $username > /dev/null 2>&1; echo $?) 
+if [ "$userExists" -eq "1" ]; then
+	echo "User $username not found."
+	exit 2
+fi
+
+sftpGroup=$(id -nG "$username" | grep -qw "sftpusers" > /dev/null 2>&1; echo $?)
+if [ "$sftpGroup" -eq "1" ]; then
+	echo "User $username not in sftpuser group."
+	exit 3
+fi
+
+sftpUser=$(echo $username | cut -d'-' -f 1)
+if [ "$sftpUser" != "sftp" ]; then
+	echo "User $username not recognized as an sftpuser."
+	exit 4
+fi
+
+echo "Deleting SFTP user: $username"
+echo "------------------"
+
+#delete user
+userdel -f $username
+
+#remove sfpt files directory
+userdir="/var/www/sftp/$username"
+#rm -Rf $userdir
+
+echo "Deleted SFTP user"
+echo "-----------------"
+echo "Username: $username"
+echo "To remove user files run:"
+echo "# rm -Rf $userdir"

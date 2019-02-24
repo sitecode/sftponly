@@ -1,0 +1,48 @@
+#!/bin/bash
+sftpBaseDir="/var/www/sftp/"
+
+if [ -z "$1" ]
+  then
+    echo "Missing username"
+    exit 1
+fi
+
+username="sftp-$(date +'%Y%m%d%H%M%S')-$1"
+
+userExists=$(id -u $username > /dev/null 2>&1; echo $?) 
+if [ "$userExists" -eq "0" ]; then
+	echo "User $username already exists."
+	exit 2
+fi
+
+userExists=$(find $sftpBaseDir -name "*$1" 2>/dev/null | wc -l) 
+if [ "$userExists" -ne "0" ]; then
+	echo "User $1 already exists."
+	echo $(find $sftpBaseDir -name "*$1")
+	exit 3
+fi
+
+
+echo "Adding SFTP user: $username"
+echo "----------------"
+
+#create the user, becasue all users have /files as their directory it'll say directory already exists
+useradd -g sftpusers -d /files -s /sbin/nologin $username
+
+#set the password automatically
+#passwd $username, returns 0 on success
+#https://www.howtogeek.com/howto/30184/10-ways-to-generate-a-random-password-from-the-command-line/
+#userpass=$(< /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c${1:-32};echo;)
+userpass=$(openssl rand -base64 18)
+echo -e "$userpass\n$userpass" | passwd $username
+
+#create user sftp files directory (their home directory)
+userdir="$sftpBaseDir$username/files/"
+mkdir -p $userdir
+chown $username $userdir
+
+echo "---------------"
+echo "Added SFTP user"
+echo "Username: $username"
+echo "Password: $userpass"
+echo "Files Directory: $userdir"

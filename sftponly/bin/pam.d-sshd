@@ -1,0 +1,63 @@
+#!/bin/bash
+#logger -t encrypt "$PAM_RHOST, $PAM_RUSER, $PAM_SERVICE, $PAM_TTY, $PAM_USER and $PAM_TYPE"
+#logger -t encrypt whoami $( whoami ) $PAM_TYPE
+#PAM_USER="sftp-20190222174043-sftp4"
+#PAM_TYPE="start_session"
+#PAM_TYPE="close_session"
+
+#problem could exist if two people are logged in uploading a file while this is running
+groups=$(id -nG "$PAM_USER" | grep -w "sftponly" | wc -l)
+if [ "$groups" -ne "0" ]; then
+	#lastLoginDate=$(last -FR $username | awk '/$user/ {print $7,$4,$5,$6}')
+	logger -t encrypt.sc.a "$lastLoginDate: $PAM_RHOST, $PAM_RUSER, $PAM_SERVICE, $PAM_TTY, $PAM_USER and $PAM_TYPE"
+
+	#TODO make this a utility function
+	username="$PAM_USER"
+	#get primary username group, should be of form sftponly-$cpanelusername
+	cpanelGroup=$(id -gn $username)
+	cpanelUsername=${cpanelGroup:9}
+	basedir="/home"
+	homedir="$basedir/sftponly/$cpanelUsername/$username/files"
+	userdir="$basedir/$cpanelUsername/sftponly/$username/files"
+	logFile="$basedir/$cpanelUsername/sftponly/$username/sftp.log"
+	cd $userdir
+
+	#mount userdir
+	if [ "$PAM_TYPE" = "open_session" ]; then
+
+		(
+			echo "$(date "+%Y%m%d %T") open, mounting $homedir"
+
+			#check if already mounted
+			if [ $(mount | grep -w $homedir | wc -l) -eq "0" ]; then
+				mount --bind $userdir $homedir
+			fi
+			#echo "$(date "+%Y%m%d %T") opened"
+		)  >> $logFile 2>&1
+
+	#encrypt on logout after files have been uploaded, and umount
+	elif [ "$PAM_TYPE" = "close_session" ]; then
+
+		(
+			echo "$(date "+%Y%m%d %T") close, scanning $userdir"
+			#logger -t a "$(date "+%Y%m%d %T") $username: $PAM_TYPE, scanning $userdir"
+
+			#encrypt all files not ending in .gpg, and then delete them
+			#gpg
+			#-o output file
+			#-e encrypt
+			#-r recipient
+			#--trust-model always - use the public key even though not trusted
+			#--yes - overwrite files, will not answer yes to question that is taken care of from above option
+			#"$1" for names with spaces, single quotes don't seem to work
+			#-- {} - suppose to be more secure to pass it in as an arg
+			#scan $homedir encase mount fails, should always be the view the user last had
+			find $homedir -not -name "*.gpg" -type f -print0 | xargs -I{} -0 sh -c 'size=$(du -kh "$1" | cut -f1); echo -n "Encrypting file: $1 ($size). "; gpg -o "$1.gpg" -e -r "[GPG RECIPIENT]" --trust-model always --yes --batch "$1"; result="$?"; if [ "$result" -eq "0" ]; then chown --reference="$1" "$1.gpg"; chmod --reference="$1" "$1.gpg"; rm "$1"; size=$(du -kh "$1.gpg" | cut -f1); echo "Success ($size). Deleted original file."; else echo "Encryption failed: $result" ; fi' -- {}
+
+			#unmount till next time, if any are currently logged in and transfering it'll probably fail
+			umount $userdir
+
+			echo "$(date "+%Y%m%d %T") closed"
+		)  >> $logFile 2>&1
+	fi
+fi
