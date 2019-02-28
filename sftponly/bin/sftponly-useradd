@@ -1,5 +1,8 @@
 #!/bin/bash
 basedir="/home"
+#pick your shell
+#nologinShell="/sbin/nologin" #default
+nologinShell="/usr/local/cpanel/bin/noshell" #cpanel
 
 if [ -z "$1" ]; then
     echo "Missing vhost username"
@@ -63,7 +66,7 @@ mkdir -p $userdir/files
 #tail -1 /etc/mtab >> /etc/fstab
 
 #create the sftp user
-useradd -g $vhostSftponlyGroup -G $sftponlyGroup -d $homedir -s /sbin/nologin $username
+useradd -g $vhostSftponlyGroup -G $sftponlyGroup -d $homedir -s $nologinShell $username
 if [ "$?" -eq "0" ]; then echo "--Added user."; fi
 
 #set the password automatically

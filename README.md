@@ -105,6 +105,19 @@ vi /home/sftponly/bin/pam.d-sshd
 
 And change `[GPG RECIPIENT]` with the desired recipient identifier (i.e. email address or name).
 
+#### 5. Other Settings
+
+Set desired no login shell based on your system
+
+```
+vi /home/sftponly/bin/sftponly-useradd
+```
+
+## Troubleshooting
+
+Sftp user gets logged out immediately after entering password. Maybe with error `Couldn't read packet: Connection reset by peer` or something else
+
+* Did you choose the correct no login shell in `sftponly-useradd`? One that exists on your system? If you already created a user, go ahead and also change their login shell to the correct one.
 
 ## Authors
 
