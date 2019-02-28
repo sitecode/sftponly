@@ -16,6 +16,10 @@ if [ "$groups" -ne "0" ]; then
 	#get primary username group, should be of form sftponly-$vhostusername
 	vhostGroup=$(id -gn $username)
 	vhostUsername=${vhostGroup:9}
+    if [ -z "$vhostUsername" ] || [ -z "$username" ]; then
+        #echo 'Missing values'
+        exit 0
+    fi
 	basedir="/home"
 	homedir="$basedir/sftponly/$vhostUsername/$username/files"
 	userdir="$basedir/$vhostUsername/sftponly/$username/files"
@@ -52,9 +56,23 @@ if [ "$groups" -ne "0" ]; then
 			#"$1" for names with spaces, single quotes don't seem to work
 			#-- {} - suppose to be more secure to pass it in as an arg
 			#scan $homedir encase mount fails, should always be the view the user last had
-			find $homedir -not -name "*.gpg" -type f -print0 | xargs -I{} -0 sh -c 'size=$(du -kh "$1" | cut -f1); echo -n "Encrypting file: $1 ($size). "; gpg -o "$1.gpg" -e -r "[GPG RECIPIENT]" --trust-model always --yes --batch "$1"; result="$?"; if [ "$result" -eq "0" ]; then chown --reference="$1" "$1.gpg"; chmod --reference="$1" "$1.gpg"; rm "$1"; size=$(du -kh "$1.gpg" | cut -f1); echo "Success ($size). Deleted original file."; else echo "Encryption failed: $result" ; fi' -- {}
+			find $homedir -not -name "*.gpg" -type f -print0 | xargs -I{} -0 sh -c '
+                size=$(du -kh "$1" | cut -f1)
+                echo -n "Encrypting file: $1 ($size). "
+                gpg -o "$1.gpg" -e -r "$2" --trust-model always --yes --batch "$1"
+                result="$?"
+                if [ "$result" -eq "0" ]; then
+                    chown --reference="$1" "$1.gpg"
+                    chmod --reference="$1" "$1.gpg"
+                    rm "$1";
+                    size=$(du -kh "$1.gpg" | cut -f1)
+                    echo "Success ($size). Deleted original file."
+                else
+                    echo "Encryption failed: $result"
+                fi
+            ' -- {} "[GPG RECIPIENT]"
 
-			#unmount till next time, if any are currently logged in and transfering it'll probably fail
+			#unmount till next time, if any are currently logged in and transferring it'll probably fail
 			umount $userdir
 
 			echo "$(date "+%Y%m%d %T") closed"
