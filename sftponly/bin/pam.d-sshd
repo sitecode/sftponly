@@ -9,7 +9,7 @@
 groups=$(id -nG "$PAM_USER" | grep -w "sftponly" | wc -l)
 if [ "$groups" -ne "0" ]; then
 	#lastLoginDate=$(last -FR $username | awk '/$user/ {print $7,$4,$5,$6}')
-	logger -t encrypt.sc.a "$lastLoginDate: $PAM_RHOST, $PAM_RUSER, $PAM_SERVICE, $PAM_TTY, $PAM_USER and $PAM_TYPE"
+	#logger -t encrypt.sc.a "$lastLoginDate: $PAM_RHOST, $PAM_RUSER, $PAM_SERVICE, $PAM_TTY, $PAM_USER and $PAM_TYPE"
 
 	#TODO make this a utility function
 	username="$PAM_USER"
@@ -24,27 +24,28 @@ if [ "$groups" -ne "0" ]; then
 	homedir="$basedir/sftponly/$vhostUsername/$username/files"
 	userdir="$basedir/$vhostUsername/sftponly/$username/files"
 	logFile="$basedir/$vhostUsername/sftponly/$username/sftp.log"
+    logDateFormat="+%Y%m%d%H%M%S"
 	cd $userdir
 
 	#mount userdir
 	if [ "$PAM_TYPE" = "open_session" ]; then
 
 		(
-			echo "$(date "+%Y%m%d %T") open, mounting $homedir"
+			echo "$(date "$logDateFormat") open, mounting $homedir"
 
 			#check if already mounted
 			if [ $(mount | grep -w $homedir | wc -l) -eq "0" ]; then
 				mount --bind $userdir $homedir
 			fi
-			#echo "$(date "+%Y%m%d %T") opened"
+			#echo "$(date "$logDateFormat") opened"
 		)  >> $logFile 2>&1
 
 	#encrypt on logout after files have been uploaded, and umount
 	elif [ "$PAM_TYPE" = "close_session" ]; then
 
 		(
-			echo "$(date "+%Y%m%d %T") close, scanning $userdir"
-			#logger -t a "$(date "+%Y%m%d %T") $username: $PAM_TYPE, scanning $userdir"
+			echo "$(date "$logDateFormat") close, scanning $userdir"
+			#logger -t a "$(date "$logDateFormat") $username: $PAM_TYPE, scanning $userdir"
 
 			#encrypt all files not ending in .gpg, and then delete them
 			#gpg
@@ -75,7 +76,7 @@ if [ "$groups" -ne "0" ]; then
 			#unmount till next time, if any are currently logged in and transferring it'll probably fail
 			umount $userdir
 
-			echo "$(date "+%Y%m%d %T") closed"
+			echo "$(date "$logDateFormat") closed"
 		)  >> $logFile 2>&1
 	fi
 fi
